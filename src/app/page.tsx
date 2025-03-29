@@ -7,18 +7,7 @@ import { z } from 'zod'
 import { DocumentTextIcon, ArrowDownTrayIcon } from '@heroicons/react/24/outline'
 import DocumentViewer from './components/DocumentViewer'
 import { downloadZip } from './utils/zip'
-
-const DOCUMENT_TYPES = [
-  { key: 'prd', label: 'Project Requirements Document' },
-  { key: 'appFlow', label: 'Application Flow' },
-  { key: 'techStack', label: 'Technology Stack' },
-  { key: 'frontend', label: 'Frontend Guidelines' },
-  { key: 'backend', label: 'Backend Structure' },
-  { key: 'cursorRules', label: 'Cursor Rules' },
-  { key: 'implementation', label: 'Implementation Plan' },
-  { key: 'bestPractices', label: 'Best Practices' },
-  { key: 'promptGuide', label: 'Prompt Guide' },
-] as const
+import { DOCUMENT_TYPES } from './types/documents'
 
 const projectSchema = z.object({
   description: z.string().min(10, 'Description must be at least 10 characters'),
@@ -38,6 +27,8 @@ export default function Home() {
   const [isDownloading, setIsDownloading] = useState(false)
   const [isZipReady, setIsZipReady] = useState(false)
   const [selectedDocs, setSelectedDocs] = useState<Set<string>>(new Set(DOCUMENT_TYPES.map(d => d.key)))
+  const [description, setDescription] = useState('')
+  const [type, setType] = useState('web')
 
   const {
     register,
@@ -75,11 +66,7 @@ export default function Home() {
     setValue('selectedDocuments', Array.from(newSelected))
   }
 
-  const generateDocument = async (
-    description: string,
-    projectType: string,
-    documentType: string
-  ) => {
+  const generateDocument = async (documentType: string) => {
     try {
       const response = await fetch('/api/generate', {
         method: 'POST',
@@ -88,65 +75,58 @@ export default function Home() {
         },
         body: JSON.stringify({
           description,
-          projectType,
+          type,
           documentType,
         }),
       })
 
+      const data = await response.json()
+
       if (!response.ok) {
-        throw new Error(`Failed to generate ${documentType}`)
+        throw new Error(data.error || 'Failed to generate document')
       }
 
-      const result = await response.json()
-      if (!result.content) {
-        throw new Error(`No content generated for ${documentType}`)
+      if (!data.content) {
+        throw new Error('No content received from API')
       }
 
-      return result.content
+      return data.content
     } catch (error) {
-      console.error(`Error generating ${documentType}:`, error)
       throw error
     }
   }
 
-  const onSubmit = async (data: ProjectFormData) => {
-    if (data.selectedDocuments.length === 0) {
-      setError('Please select at least one document to generate')
-      return
-    }
-
+  const onSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
     setIsGenerating(true)
-    setError(null)
     setDocuments({})
     setGenerationErrors({})
     setProgress(0)
     setIsZipReady(false)
 
-    const totalDocs = data.selectedDocuments.length
-    let completedDocs = 0
-    const newDocuments: Record<string, string> = {}
-    const newErrors: Record<string, string> = {}
+    const totalDocuments = DOCUMENT_TYPES.length
+    let completedDocuments = 0
 
-    for (const docType of data.selectedDocuments) {
+    for (const docType of DOCUMENT_TYPES) {
       try {
-        setCurrentDocType(docType)
-        const content = await generateDocument(data.description, data.projectType, docType)
-        newDocuments[docType] = content
-        completedDocs++
-        setProgress((completedDocs / totalDocs) * 100)
+        const content = await generateDocument(docType.key)
+        setDocuments(prev => ({
+          ...prev,
+          [docType.key]: content
+        }))
       } catch (error) {
-        console.error(`Error generating ${docType}:`, error)
-        newErrors[docType] = `Failed to generate ${docType}`
+        console.error(`Error generating ${docType.label}:`, error)
+        setGenerationErrors(prev => ({
+          ...prev,
+          [docType.key]: error instanceof Error ? error.message : 'Failed to generate document'
+        }))
       }
+      completedDocuments++
+      setProgress((completedDocuments / totalDocuments) * 100)
     }
 
-    setDocuments(newDocuments)
-    setGenerationErrors(newErrors)
     setIsGenerating(false)
-    setCurrentDocType(null)
-    
-    // Only set ZIP as ready if all selected documents were generated successfully
-    setIsZipReady(Object.keys(newDocuments).length === totalDocs)
+    setIsZipReady(true)
   }
 
   const handleDownload = async () => {
@@ -176,21 +156,21 @@ export default function Home() {
           </p>
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 mb-12">
+        <form onSubmit={onSubmit} className="space-y-6 mb-12">
           <div>
-            <label htmlFor="projectType" className="block text-sm font-medium text-gray-200 mb-2">
+            <label htmlFor="type" className="block text-sm font-medium text-gray-200 mb-2">
               Project Type
             </label>
             <select
-              id="projectType"
-              {...register('projectType')}
+              id="type"
+              value={type}
+              onChange={(e) => setType(e.target.value)}
               className="w-full rounded-md border-gray-600 bg-gray-800 text-white shadow-sm focus:border-blue-500 focus:ring-blue-500"
-              defaultValue="web"
             >
               <option value="web">Web Application</option>
-              <option value="mobile">Mobile App</option>
+              <option value="mobile">Mobile Application</option>
               <option value="desktop">Desktop Application</option>
-              <option value="ai">AI/ML Project</option>
+              <option value="ai">AI/ML Application</option>
               <option value="other">Other</option>
             </select>
             {errors.projectType && (
@@ -204,10 +184,11 @@ export default function Home() {
             </label>
             <textarea
               id="description"
-              rows={6}
-              {...register('description')}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
               className="w-full rounded-md border-gray-600 bg-gray-800 text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 placeholder-gray-400"
-              placeholder="Describe your project idea, features, and requirements..."
+              rows={6}
+              placeholder="Describe your project in detail..."
             />
             {errors.description && (
               <p className="mt-1 text-sm text-red-400">{errors.description.message}</p>
@@ -280,10 +261,12 @@ export default function Home() {
 
           <button
             type="submit"
-            disabled={isGenerating}
-            className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed focus:ring-offset-gray-900"
+            disabled={isGenerating || !description.trim()}
+            className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed focus:ring-offset-gray-900 ${
+              isGenerating || !description.trim() ? 'cursor-not-allowed' : ''
+            }`}
           >
-            {isGenerating ? 'Generating Documentation...' : 'Generate Documentation'}
+            {isGenerating ? 'Generating Documents...' : 'Generate Documents'}
           </button>
         </form>
 
@@ -304,19 +287,7 @@ export default function Home() {
                 </button>
               )}
             </div>
-            <DocumentViewer documents={documents} />
-            {Object.entries(generationErrors).length > 0 && (
-              <div className="mt-4 p-4 rounded-md bg-red-900/50 border border-red-700">
-                <h3 className="text-sm font-medium text-red-400 mb-2">Generation Errors:</h3>
-                <ul className="list-disc pl-5 space-y-1">
-                  {Object.entries(generationErrors).map(([docType, error]) => (
-                    <li key={docType} className="text-sm text-red-400">
-                      {DOCUMENT_TYPES.find(d => d.key === docType)?.label}: {error}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
+            <DocumentViewer documents={documents} errors={generationErrors} />
           </div>
         )}
       </div>

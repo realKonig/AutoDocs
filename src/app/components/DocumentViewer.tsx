@@ -1,110 +1,80 @@
 'use client'
 
 import { useState } from 'react'
-import { Tab } from '@headlessui/react'
-import { DocumentTextIcon, CodeBracketIcon, CommandLineIcon, WrenchScrewdriverIcon, ServerIcon, CursorArrowRaysIcon, CalendarIcon, CheckCircleIcon, ChatBubbleBottomCenterTextIcon } from '@heroicons/react/24/outline'
 import { marked } from 'marked'
+import { DOCUMENT_TYPES } from '../types/documents'
 
 interface DocumentViewerProps {
-  documents: Partial<{
-    prd: string
-    appFlow: string
-    techStack: string
-    frontend: string
-    backend: string
-    cursorRules: string
-    implementation: string
-    bestPractices: string
-    promptGuide: string
-  }>
+  documents: Record<string, string>
+  errors: Record<string, string>
 }
 
-const tabs = [
-  { name: 'PRD', icon: DocumentTextIcon, key: 'prd' },
-  { name: 'App Flow', icon: CodeBracketIcon, key: 'appFlow' },
-  { name: 'Tech Stack', icon: CommandLineIcon, key: 'techStack' },
-  { name: 'Frontend', icon: WrenchScrewdriverIcon, key: 'frontend' },
-  { name: 'Backend', icon: ServerIcon, key: 'backend' },
-  { name: 'Cursor Rules', icon: CursorArrowRaysIcon, key: 'cursorRules' },
-  { name: 'Implementation', icon: CalendarIcon, key: 'implementation' },
-  { name: 'Best Practices', icon: CheckCircleIcon, key: 'bestPractices' },
-  { name: 'Prompt Guide', icon: ChatBubbleBottomCenterTextIcon, key: 'promptGuide' },
-] as const
+export function DocumentViewer({ documents, errors }: DocumentViewerProps) {
+  const [activeTab, setActiveTab] = useState<string | null>(
+    Object.keys(documents)[0] || null
+  )
 
-export default function DocumentViewer({ documents }: DocumentViewerProps) {
-  const [selectedIndex, setSelectedIndex] = useState(0)
+  const availableTabs = DOCUMENT_TYPES.filter(
+    docType => documents[docType.key] || errors[docType.key]
+  )
 
-  // Filter tabs to only show documents that have been generated
-  const availableTabs = tabs.filter(tab => documents[tab.key as keyof typeof documents])
-
-  if (availableTabs.length === 0) {
-    return (
-      <div className="text-center text-gray-400">
-        No documents generated yet.
-      </div>
-    )
-  }
-
-  const renderContent = (content: string | undefined) => {
-    if (!content) {
+  const renderContent = (docType: string) => {
+    if (errors[docType]) {
       return (
-        <div className="text-center text-gray-400">
-          Document not generated yet.
+        <div className="p-4 rounded-md bg-red-900/50 border border-red-700">
+          <p className="text-red-400">{errors[docType]}</p>
         </div>
       )
     }
 
-    // Split content into paragraphs and render with proper formatting
+    if (!documents[docType]) {
+      return (
+        <div className="p-4 text-gray-400">
+          No content available for this document.
+        </div>
+      )
+    }
+
     return (
-      <div className="prose prose-invert max-w-none">
-        {content.split('\n').map((paragraph, index) => {
-          if (!paragraph.trim()) return null
-          return (
-            <div 
-              key={index} 
-              className="mb-4"
-              dangerouslySetInnerHTML={{ 
-                __html: marked(paragraph, { breaks: true })
-              }} 
-            />
-          )
-        })}
-      </div>
+      <div
+        className="prose prose-invert max-w-none"
+        dangerouslySetInnerHTML={{
+          __html: marked(documents[docType], { breaks: true }),
+        }}
+      />
     )
   }
 
+  if (availableTabs.length === 0) {
+    return null
+  }
+
   return (
-    <div className="w-full">
-      <Tab.Group selectedIndex={selectedIndex} onChange={setSelectedIndex}>
-        <Tab.List className="flex space-x-1 rounded-xl bg-gray-800 p-1">
-          {availableTabs.map((tab) => (
-            <Tab
-              key={tab.key}
-              className={({ selected }) =>
-                `w-full flex items-center justify-center rounded-lg py-2.5 text-sm font-medium leading-5
-                ${
-                  selected
-                    ? 'bg-gray-700 text-blue-400 shadow-inner'
-                    : 'text-gray-400 hover:bg-gray-700/50 hover:text-gray-300'
-                }`
-              }
+    <div className="mt-8">
+      <div className="border-b border-gray-700">
+        <nav className="-mb-px flex space-x-4" aria-label="Tabs">
+          {availableTabs.map((docType) => (
+            <button
+              key={docType.key}
+              onClick={() => setActiveTab(docType.key)}
+              className={`whitespace-nowrap py-2 px-4 border-b-2 font-medium text-sm ${
+                activeTab === docType.key
+                  ? 'border-blue-500 text-blue-400'
+                  : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-300'
+              }`}
             >
-              <tab.icon className="w-5 h-5 mr-2" />
-              {tab.name}
-            </Tab>
+              {docType.label}
+              {errors[docType.key] && (
+                <span className="ml-2 text-red-500">⚠️</span>
+              )}
+            </button>
           ))}
-        </Tab.List>
-        <Tab.Panels className="mt-2">
-          {availableTabs.map((tab) => (
-            <Tab.Panel
-              key={tab.key}
-              className={`rounded-xl bg-gray-800 p-6 shadow-lg ring-1 ring-white/10`}
-            >
-              {renderContent(documents[tab.key as keyof typeof documents])}
-            </Tab.Panel>
-          ))}
-        </Tab.Panels>
-      </Tab.Group>
+        </nav>
+      </div>
+
+      <div className="mt-8 prose prose-invert max-w-none">
+        {activeTab && renderContent(activeTab)}
+      </div>
     </div>
   )
 } 
