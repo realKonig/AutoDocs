@@ -1,8 +1,67 @@
 @import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@layer base {
+  :root {
+    --background: 224 71% 4%;
+    --foreground: 213 31% 91%;
+
+    --primary: 210 40% 98%;
+    --primary-foreground: 222.2 47.4% 1.2%;
+
+    --muted: 223 47% 11%;
+    --muted-foreground: 215.4 16.3% 56.9%;
+
+    --accent: 216 34% 17%;
+    --accent-foreground: 210 40% 98%;
+
+    --border: 216 34% 17%;
+    --input: 216 34% 17%;
+    --ring: 216 34% 17%;
+
+    --radius: 0.5rem;
+  }
+}
+
+/* Customize prose styles for dark mode */
+.prose {
+  --tw-prose-body: theme('colors.gray.300');
+  --tw-prose-headings: theme('colors.white');
+  --tw-prose-lead: theme('colors.gray.400');
+  --tw-prose-links: theme('colors.blue.400');
+  --tw-prose-bold: theme('colors.white');
+  --tw-prose-counters: theme('colors.gray.400');
+  --tw-prose-bullets: theme('colors.gray.600');
+  --tw-prose-hr: theme('colors.gray.700');
+  --tw-prose-quotes: theme('colors.gray.300');
+  --tw-prose-quote-borders: theme('colors.gray.700');
+  --tw-prose-captions: theme('colors.gray.400');
+  --tw-prose-code: theme('colors.white');
+  --tw-prose-pre-code: theme('colors.gray.300');
+  --tw-prose-pre-bg: theme('colors.gray.800');
+  --tw-prose-th-borders: theme('colors.gray.700');
+  --tw-prose-td-borders: theme('colors.gray.700');
+}
+
+/* Add custom scrollbar styles */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: theme('colors.gray.800');
+}
+
+::-webkit-scrollbar-thumb {
+  background: theme('colors.gray.600');
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: theme('colors.gray.500');
 }
 
 @theme inline {
