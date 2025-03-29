@@ -39,6 +39,9 @@ export default function Home() {
 
   const generateDocument = async (documentType: string) => {
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 90000); // 90 second timeout
+
       const response = await fetch('/api/generate', {
         method: 'POST',
         headers: {
@@ -49,69 +52,86 @@ export default function Home() {
           type,
           documentType,
         }),
-      })
+        signal: controller.signal,
+      });
 
-      const data = await response.json()
+      clearTimeout(timeoutId);
+
+      const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to generate document')
+        const errorMessage = data.message || data.error || 'Failed to generate document';
+        throw new Error(errorMessage);
       }
 
       if (!data.content) {
-        throw new Error('No content received from API')
+        throw new Error('No content received from API');
       }
 
-      return data.content
+      return data.content;
     } catch (error) {
-      throw error
+      if (error instanceof Error) {
+        if (error.name === 'AbortError') {
+          throw new Error('Request timed out. Please try again.');
+        }
+        throw new Error(error.message);
+      }
+      throw new Error('An unexpected error occurred');
     }
-  }
+  };
 
   const onSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+    e.preventDefault();
     
     if (!description.trim()) {
-      setError('Description is required')
-      return
+      setError('Description is required');
+      return;
     }
 
     if (selectedDocs.size === 0) {
-      setError('Select at least one document to generate')
-      return
+      setError('Select at least one document to generate');
+      return;
     }
 
-    setError(null)
-    setIsGenerating(true)
-    setDocuments({})
-    setGenerationErrors({})
-    setProgress(0)
-    setIsZipReady(false)
+    setError(null);
+    setIsGenerating(true);
+    setDocuments({});
+    setGenerationErrors({});
+    setProgress(0);
+    setIsZipReady(false);
 
-    const selectedDocTypes = DOCUMENT_TYPES.filter(doc => selectedDocs.has(doc.key))
-    const totalDocuments = selectedDocTypes.length
-    let completedDocuments = 0
+    const selectedDocTypes = DOCUMENT_TYPES.filter(doc => selectedDocs.has(doc.key));
+    const totalDocuments = selectedDocTypes.length;
+    let completedDocuments = 0;
+    let hasErrors = false;
 
     for (const docType of selectedDocTypes) {
       try {
-        const content = await generateDocument(docType.key)
+        const content = await generateDocument(docType.key);
         setDocuments(prev => ({
           ...prev,
           [docType.key]: content
-        }))
+        }));
       } catch (error) {
-        console.error(`Error generating ${docType.label}:`, error)
+        hasErrors = true;
+        console.error(`Error generating ${docType.label}:`, error);
+        const errorMessage = error instanceof Error ? error.message : 'Failed to generate document';
         setGenerationErrors(prev => ({
           ...prev,
-          [docType.key]: error instanceof Error ? error.message : 'Failed to generate document'
-        }))
+          [docType.key]: errorMessage
+        }));
       }
-      completedDocuments++
-      setProgress((completedDocuments / totalDocuments) * 100)
+      completedDocuments++;
+      setProgress((completedDocuments / totalDocuments) * 100);
     }
 
-    setIsGenerating(false)
-    setIsZipReady(true)
-  }
+    setIsGenerating(false);
+    setIsZipReady(!hasErrors);
+
+    if (hasErrors) {
+      setError('Some documents failed to generate. Check the errors below.');
+    }
+  };
 
   const handleDownload = async () => {
     if (!isZipReady) return
