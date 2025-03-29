@@ -5,7 +5,7 @@ AutoDocs is an AI-powered documentation generator that creates comprehensive pro
 ## Features
 
 - **AI-Powered Document Generation**: Uses GPT-4 to generate detailed documentation
-- **Multiple Document Types**: Generates 8 different types of documents:
+- **Multiple Document Types**: Generates 9 different types of documents:
   - Project Requirements Document (PRD)
   - Application Flow
   - Technology Stack
@@ -14,6 +14,7 @@ AutoDocs is an AI-powered documentation generator that creates comprehensive pro
   - Cursor Rules
   - Implementation Plan
   - Best Practices
+  - Prompt Guide (AI Development Guide)
 - **Project Type Support**: Tailored documentation for different project types:
   - Web Applications
   - Mobile Apps

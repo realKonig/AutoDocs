@@ -8,57 +8,78 @@ import { DocumentTextIcon, ArrowDownTrayIcon } from '@heroicons/react/24/outline
 import DocumentViewer from './components/DocumentViewer'
 import { downloadZip } from './utils/zip'
 
-const projectSchema = z.object({
-  description: z.string().min(10, 'Description must be at least 10 characters'),
-  projectType: z.enum(['web', 'mobile', 'desktop', 'ai', 'other']),
-})
-
-type ProjectFormData = z.infer<typeof projectSchema>
-
-interface GeneratedDocuments {
-  prd: string
-  appFlow: string
-  techStack: string
-  frontend: string
-  backend: string
-  cursorRules: string
-  implementation: string
-  bestPractices: string
-}
-
 const DOCUMENT_TYPES = [
-  { key: 'prd', label: 'Project Requirements' },
-  { key: 'appFlow', label: 'App Flow' },
-  { key: 'techStack', label: 'Tech Stack' },
+  { key: 'prd', label: 'Project Requirements Document' },
+  { key: 'appFlow', label: 'Application Flow' },
+  { key: 'techStack', label: 'Technology Stack' },
   { key: 'frontend', label: 'Frontend Guidelines' },
   { key: 'backend', label: 'Backend Structure' },
   { key: 'cursorRules', label: 'Cursor Rules' },
   { key: 'implementation', label: 'Implementation Plan' },
   { key: 'bestPractices', label: 'Best Practices' },
+  { key: 'promptGuide', label: 'Prompt Guide' },
 ] as const
 
+const projectSchema = z.object({
+  description: z.string().min(10, 'Description must be at least 10 characters'),
+  projectType: z.enum(['web', 'mobile', 'desktop', 'ai', 'other']),
+  selectedDocuments: z.array(z.string()).min(1, 'Select at least one document to generate'),
+})
+
+type ProjectFormData = z.infer<typeof projectSchema>
+
 export default function Home() {
+  const [documents, setDocuments] = useState<Record<string, string>>({})
   const [isGenerating, setIsGenerating] = useState(false)
   const [currentDocType, setCurrentDocType] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [documents, setDocuments] = useState<Partial<GeneratedDocuments>>({})
   const [progress, setProgress] = useState<number>(0)
   const [generationErrors, setGenerationErrors] = useState<Record<string, string>>({})
   const [isDownloading, setIsDownloading] = useState(false)
+  const [isZipReady, setIsZipReady] = useState(false)
+  const [selectedDocs, setSelectedDocs] = useState<Set<string>>(new Set(DOCUMENT_TYPES.map(d => d.key)))
 
   const {
     register,
     handleSubmit,
+    setValue,
     formState: { errors },
-    watch,
   } = useForm<ProjectFormData>({
     resolver: zodResolver(projectSchema),
+    defaultValues: {
+      projectType: 'web',
+      description: '',
+      selectedDocuments: DOCUMENT_TYPES.map(d => d.key),
+    },
   })
 
-  const generateDocument = async (documentType: keyof GeneratedDocuments, projectType: string, description: string) => {
-    console.log(`Generating document: ${documentType}`)
-    setCurrentDocType(documentType)
-    
+  const handleSelectAll = () => {
+    const allDocs = DOCUMENT_TYPES.map(d => d.key)
+    setSelectedDocs(new Set(allDocs))
+    setValue('selectedDocuments', allDocs)
+  }
+
+  const handleDeselectAll = () => {
+    setSelectedDocs(new Set())
+    setValue('selectedDocuments', [])
+  }
+
+  const handleToggleDocument = (docKey: string) => {
+    const newSelected = new Set(selectedDocs)
+    if (newSelected.has(docKey)) {
+      newSelected.delete(docKey)
+    } else {
+      newSelected.add(docKey)
+    }
+    setSelectedDocs(newSelected)
+    setValue('selectedDocuments', Array.from(newSelected))
+  }
+
+  const generateDocument = async (
+    description: string,
+    projectType: string,
+    documentType: string
+  ) => {
     try {
       const response = await fetch('/api/generate', {
         method: 'POST',
@@ -66,71 +87,71 @@ export default function Home() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          documentType,
-          projectType,
           description,
+          projectType,
+          documentType,
         }),
       })
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        console.error('API Error:', errorData)
-        throw new Error(errorData.error || 'Failed to generate documentation')
+        throw new Error(`Failed to generate ${documentType}`)
       }
 
       const result = await response.json()
       if (!result.content) {
-        throw new Error('No content received from API')
+        throw new Error(`No content generated for ${documentType}`)
       }
+
       return result.content
-    } catch (err) {
-      console.error(`Error generating ${documentType}:`, err)
-      throw err
+    } catch (error) {
+      console.error(`Error generating ${documentType}:`, error)
+      throw error
     }
   }
 
   const onSubmit = async (data: ProjectFormData) => {
+    if (data.selectedDocuments.length === 0) {
+      setError('Please select at least one document to generate')
+      return
+    }
+
     setIsGenerating(true)
     setError(null)
     setDocuments({})
-    setProgress(0)
     setGenerationErrors({})
-    
-    console.log('Starting document generation with data:', data)
-    
-    let hasError = false
-    
-    for (const [index, docType] of DOCUMENT_TYPES.entries()) {
-      if (hasError) break
-      
+    setProgress(0)
+    setIsZipReady(false)
+
+    const totalDocs = data.selectedDocuments.length
+    let completedDocs = 0
+    const newDocuments: Record<string, string> = {}
+    const newErrors: Record<string, string> = {}
+
+    for (const docType of data.selectedDocuments) {
       try {
-        const content = await generateDocument(
-          docType.key as keyof GeneratedDocuments,
-          data.projectType,
-          data.description
-        )
-        
-        setDocuments(prev => ({
-          ...prev,
-          [docType.key]: content
-        }))
-        
-        setProgress(((index + 1) / DOCUMENT_TYPES.length) * 100)
-      } catch (err) {
-        console.error(`Error generating ${docType.key}:`, err)
-        setGenerationErrors(prev => ({
-          ...prev,
-          [docType.key]: err instanceof Error ? err.message : 'Unknown error'
-        }))
-        hasError = true
+        setCurrentDocType(docType)
+        const content = await generateDocument(data.description, data.projectType, docType)
+        newDocuments[docType] = content
+        completedDocs++
+        setProgress((completedDocs / totalDocs) * 100)
+      } catch (error) {
+        console.error(`Error generating ${docType}:`, error)
+        newErrors[docType] = `Failed to generate ${docType}`
       }
     }
-    
+
+    setDocuments(newDocuments)
+    setGenerationErrors(newErrors)
     setIsGenerating(false)
     setCurrentDocType(null)
+    
+    // Only set ZIP as ready if all selected documents were generated successfully
+    setIsZipReady(Object.keys(newDocuments).length === totalDocs)
   }
 
   const handleDownload = async () => {
+    if (!isZipReady) return
+    
     setIsDownloading(true)
     try {
       await downloadZip(documents)
@@ -193,6 +214,49 @@ export default function Home() {
             )}
           </div>
 
+          <div>
+            <div className="flex justify-between items-center mb-4">
+              <label className="block text-sm font-medium text-gray-200">
+                Select Documents to Generate
+              </label>
+              <div className="space-x-4">
+                <button
+                  type="button"
+                  onClick={handleSelectAll}
+                  className="text-sm text-blue-400 hover:text-blue-300"
+                >
+                  Select All
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDeselectAll}
+                  className="text-sm text-blue-400 hover:text-blue-300"
+                >
+                  Deselect All
+                </button>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              {DOCUMENT_TYPES.map((doc) => (
+                <div key={doc.key} className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id={doc.key}
+                    checked={selectedDocs.has(doc.key)}
+                    onChange={() => handleToggleDocument(doc.key)}
+                    className="h-4 w-4 rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500 focus:ring-offset-gray-900"
+                  />
+                  <label htmlFor={doc.key} className="ml-2 text-sm text-gray-300">
+                    {doc.label}
+                  </label>
+                </div>
+              ))}
+            </div>
+            {errors.selectedDocuments && (
+              <p className="mt-2 text-sm text-red-400">{errors.selectedDocuments.message}</p>
+            )}
+          </div>
+
           {error && (
             <div className="rounded-md bg-red-900/50 border border-red-700 p-4">
               <div className="text-sm text-red-400">{error}</div>
@@ -230,11 +294,13 @@ export default function Home() {
               {Object.keys(documents).length > 0 && (
                 <button
                   onClick={handleDownload}
-                  disabled={isDownloading}
+                  disabled={isDownloading || !isZipReady || isGenerating}
                   className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed focus:ring-offset-gray-900"
                 >
                   <ArrowDownTrayIcon className="h-5 w-5 mr-2" />
-                  {isDownloading ? 'Downloading...' : 'Download Knowledge Base'}
+                  {isDownloading ? 'Downloading...' : 
+                   !isZipReady ? `Generating (${Math.round(progress)}%)` : 
+                   'Download Knowledge Base'}
                 </button>
               )}
             </div>

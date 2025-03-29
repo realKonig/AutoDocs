@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { Tab } from '@headlessui/react'
-import { DocumentTextIcon, CodeBracketIcon, CommandLineIcon, WrenchScrewdriverIcon, ServerIcon, CursorArrowRaysIcon, CalendarIcon, CheckCircleIcon } from '@heroicons/react/24/outline'
+import { DocumentTextIcon, CodeBracketIcon, CommandLineIcon, WrenchScrewdriverIcon, ServerIcon, CursorArrowRaysIcon, CalendarIcon, CheckCircleIcon, ChatBubbleBottomCenterTextIcon } from '@heroicons/react/24/outline'
 import { marked } from 'marked'
 
 interface DocumentViewerProps {
@@ -15,6 +15,7 @@ interface DocumentViewerProps {
     cursorRules: string
     implementation: string
     bestPractices: string
+    promptGuide: string
   }>
 }
 
@@ -27,6 +28,7 @@ const tabs = [
   { name: 'Cursor Rules', icon: CursorArrowRaysIcon, key: 'cursorRules' },
   { name: 'Implementation', icon: CalendarIcon, key: 'implementation' },
   { name: 'Best Practices', icon: CheckCircleIcon, key: 'bestPractices' },
+  { name: 'Prompt Guide', icon: ChatBubbleBottomCenterTextIcon, key: 'promptGuide' },
 ] as const
 
 export default function DocumentViewer({ documents }: DocumentViewerProps) {

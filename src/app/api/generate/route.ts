@@ -2,10 +2,10 @@ import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { z } from 'zod'
 
-const requestSchema = z.object({
+const projectSchema = z.object({
   description: z.string().min(10),
   projectType: z.enum(['web', 'mobile', 'desktop', 'ai', 'other']),
-  documentType: z.enum(['prd', 'appFlow', 'techStack', 'frontend', 'backend', 'cursorRules', 'implementation', 'bestPractices'])
+  documentType: z.enum(['prd', 'appFlow', 'techStack', 'frontend', 'backend', 'cursorRules', 'implementation', 'bestPractices', 'promptGuide'])
 })
 
 // Initialize OpenAI client
@@ -13,8 +13,20 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 })
 
-const DOCUMENT_PROMPTS: Record<string, (projectType: string, description: string) => string> = {
-  prd: (projectType, description) => `As an expert product manager, create a comprehensive Project Requirements Document (PRD) for a ${projectType} project with the following description:
+export const DOCUMENT_TYPES = [
+  { key: 'prd', label: 'Project Requirements Document' },
+  { key: 'appFlow', label: 'Application Flow' },
+  { key: 'techStack', label: 'Technology Stack' },
+  { key: 'frontend', label: 'Frontend Guidelines' },
+  { key: 'backend', label: 'Backend Structure' },
+  { key: 'cursorRules', label: 'Cursor Rules' },
+  { key: 'implementation', label: 'Implementation Plan' },
+  { key: 'bestPractices', label: 'Best Practices' },
+  { key: 'promptGuide', label: 'Prompt Guide' },
+] as const
+
+const DOCUMENT_PROMPTS = {
+  prd: (description: string, type: string) => `As an expert product manager, create a comprehensive Project Requirements Document (PRD) for a ${type} project with the following description:
 
 ${description}
 
@@ -31,7 +43,7 @@ The PRD should include:
 
 Format the response in a clear, structured manner using markdown headings and bullet points where appropriate.`,
 
-  appFlow: (projectType, description) => `As an experienced UX architect, create a detailed App Flow Document for a ${projectType} project with the following description:
+  appFlow: (description: string, type: string) => `As an experienced UX architect, create a detailed App Flow Document for a ${type} project with the following description:
 
 ${description}
 
@@ -47,7 +59,7 @@ Include:
 
 Focus on creating a clear, logical flow that optimizes user experience. Use descriptive steps and consider edge cases.`,
 
-  techStack: (projectType, description) => `As a solutions architect, recommend a comprehensive Technology Stack for a ${projectType} project with the following description:
+  techStack: (description: string, type: string) => `As a solutions architect, recommend a comprehensive Technology Stack for a ${type} project with the following description:
 
 ${description}
 
@@ -67,7 +79,7 @@ For each recommendation:
 - Include version recommendations
 - List alternatives considered`,
 
-  frontend: (projectType, description) => `As a senior frontend architect, create detailed Frontend Guidelines for a ${projectType} project with the following description:
+  frontend: (description: string, type: string) => `As a senior frontend architect, create detailed Frontend Guidelines for a ${type} project with the following description:
 
 ${description}
 
@@ -84,7 +96,7 @@ Include:
 
 Provide specific examples and patterns where relevant.`,
 
-  backend: (projectType, description) => `As a backend architect, create a comprehensive Backend Structure document for a ${projectType} project with the following description:
+  backend: (description: string, type: string) => `As a backend architect, create a comprehensive Backend Structure document for a ${type} project with the following description:
 
 ${description}
 
@@ -101,7 +113,7 @@ Cover:
 
 Include specific patterns, examples, and considerations for this project type.`,
 
-  cursorRules: (projectType, description) => `As an AI development expert, create CursorAI Rules for a ${projectType} project with the following description:
+  cursorRules: (description: string, type: string) => `As an AI development expert, create CursorAI Rules for a ${type} project with the following description:
 
 ${description}
 
@@ -117,7 +129,7 @@ Define:
 
 Format as a .cursorrules configuration that can be used by AI coding assistants.`,
 
-  implementation: (projectType, description) => `As a technical project manager, create a detailed Implementation Plan for a ${projectType} project with the following description:
+  implementation: (description: string, type: string) => `As a technical project manager, create a detailed Implementation Plan for a ${type} project with the following description:
 
 ${description}
 
@@ -134,7 +146,7 @@ Include:
 
 Provide a realistic, phased approach with clear milestones and deliverables.`,
 
-  bestPractices: (projectType, description) => `As a senior software engineer, compile comprehensive Best Practices for a ${projectType} project with the following description:
+  bestPractices: (description: string, type: string) => `As a senior software engineer, compile comprehensive Best Practices for a ${type} project with the following description:
 
 ${description}
 
@@ -149,8 +161,64 @@ Cover:
 8. Maintenance Procedures
 9. Collaboration Guidelines
 
-Include specific examples and recommendations tailored to this project type.`
-}
+Include specific examples and recommendations tailored to this project type.`,
+
+  promptGuide: (description: string, type: string) => `As an AI development expert, create a comprehensive Prompt Guide for effectively using Cursor AI to build this ${type} project with the following description:
+
+${description}
+
+The guide should include:
+
+1. Best Practices for AI Interaction
+   - How to structure prompts for optimal results
+   - Tips for providing clear context
+   - Ways to break down complex tasks
+   - Techniques for iterative refinement
+
+2. Documentation Integration
+   - How to reference the generated documents effectively
+   - Using project requirements in prompts
+   - Maintaining consistency with architecture decisions
+   - Incorporating technical specifications
+
+3. Common Development Tasks
+   - Component/module creation prompts
+   - Testing and validation prompts
+   - Debugging assistance prompts
+   - Code review and improvement prompts
+
+4. Project-Specific Guidelines
+   - Using project terminology correctly
+   - Following established patterns
+   - Maintaining consistent style
+   - Adhering to project constraints
+
+5. Troubleshooting & Refinement
+   - Identifying prompt issues
+   - Improving unclear responses
+   - Handling edge cases
+   - Iterating on generated code
+
+6. Examples & Templates
+   - Feature implementation prompts
+   - Architecture alignment checks
+   - Code optimization requests
+   - Documentation updates
+
+7. Integration with Development Workflow
+   - When to use AI assistance
+   - Combining AI with manual development
+   - Code review workflow
+   - Documentation maintenance
+
+8. Best Practices & Pitfalls
+   - What to avoid in prompts
+   - Security considerations
+   - Performance optimization requests
+   - Maintaining code quality
+
+Format the guide with clear sections, examples, and actionable advice. Focus on practical, project-specific guidance that will help developers work effectively with Cursor AI while maintaining alignment with the project's documentation and requirements.`
+} as const
 
 export async function POST(request: Request) {
   console.log('Received API request to /api/generate')
@@ -160,7 +228,7 @@ export async function POST(request: Request) {
     const body = await request.json()
     console.log('Request body:', body)
     
-    const validatedData = requestSchema.parse(body)
+    const validatedData = projectSchema.parse(body)
     console.log('Validated data:', validatedData)
 
     if (!process.env.OPENAI_API_KEY) {
@@ -172,29 +240,36 @@ export async function POST(request: Request) {
     }
 
     const promptGenerator = DOCUMENT_PROMPTS[validatedData.documentType]
-    const prompt = promptGenerator(validatedData.projectType, validatedData.description)
+    if (!promptGenerator) {
+      return NextResponse.json(
+        { error: `Invalid document type: ${validatedData.documentType}` },
+        { status: 400 }
+      )
+    }
+
+    const prompt = promptGenerator(validatedData.description, validatedData.projectType)
 
     console.log('Making request to OpenAI API for document:', validatedData.documentType)
     
     const completion = await openai.chat.completions.create({
-      model: "gpt-4-turbo-preview",
+      model: 'gpt-4',
       messages: [
         {
-          role: "system",
-          content: "You are an expert software architect and technical writer. Generate detailed, well-structured documentation that follows industry best practices. Use markdown formatting for better readability."
+          role: 'system',
+          content: 'You are an expert software development documentation writer. Create detailed, well-structured documentation using markdown formatting.',
         },
         {
-          role: "user",
-          content: prompt
-        }
+          role: 'user',
+          content: prompt,
+        },
       ],
       temperature: 0.7,
-      max_tokens: 4000,
+      max_tokens: 2500,
     })
 
     console.log('Received response from OpenAI')
     
-    const content = completion.choices[0].message.content || ''
+    const content = completion.choices[0]?.message?.content || ''
     console.log('Generated content length:', content.length)
 
     return NextResponse.json({ content })

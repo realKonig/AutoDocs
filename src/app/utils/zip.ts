@@ -9,6 +9,7 @@ export interface DocumentData {
   cursorRules: string
   implementation: string
   bestPractices: string
+  promptGuide: string
 }
 
 export const createKnowledgeBaseZip = async (documents: Partial<DocumentData>) => {
@@ -29,6 +30,7 @@ export const createKnowledgeBaseZip = async (documents: Partial<DocumentData>) =
     cursorRules: 'Cursor_Rules.md',
     implementation: 'Implementation_Plan.md',
     bestPractices: 'Best_Practices.md',
+    promptGuide: 'Prompt_Guide.md',
   }
 
   // Add each document to the ZIP if it exists
