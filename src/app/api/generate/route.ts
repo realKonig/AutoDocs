@@ -11,10 +11,12 @@ export const runtime = 'edge';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
-  timeout: 60000, // 60 seconds timeout for OpenAI requests
 });
 
 export async function POST(req: Request) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
+
   try {
     if (!process.env.OPENAI_API_KEY) {
       return NextResponse.json(
@@ -39,8 +41,9 @@ export async function POST(req: Request) {
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.7,
       max_tokens: 2500,
-      timeout: 60000, // 60 seconds timeout
     });
+
+    clearTimeout(timeoutId);
 
     const content = completion.choices[0]?.message?.content;
 
@@ -64,6 +67,7 @@ export async function POST(req: Request) {
       }
     );
   } catch (error) {
+    clearTimeout(timeoutId);
     console.error('Error generating document:', error);
     
     // Handle specific error types
