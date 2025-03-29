@@ -1,12 +1,10 @@
 import { NextResponse } from 'next/server'
-import { Configuration, OpenAIApi } from 'openai'
+import OpenAI from 'openai'
 import { DocumentType, DOCUMENT_PROMPTS } from '@/app/types/documents'
 
-const configuration = new Configuration({
+const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 })
-
-const openai = new OpenAIApi(configuration)
 
 export async function POST(req: Request) {
   try {
@@ -21,14 +19,14 @@ export async function POST(req: Request) {
 
     const prompt = DOCUMENT_PROMPTS[documentType as DocumentType](description, type)
 
-    const completion = await openai.createChatCompletion({
+    const completion = await openai.chat.completions.create({
       model: 'gpt-4',
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.7,
       max_tokens: 2500,
     })
 
-    const content = completion.data.choices[0]?.message?.content
+    const content = completion.choices[0]?.message?.content
 
     if (!content) {
       return NextResponse.json(

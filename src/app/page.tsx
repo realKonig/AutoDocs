@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { DocumentTextIcon, ArrowDownTrayIcon } from '@heroicons/react/24/outline'
-import DocumentViewer from './components/DocumentViewer'
+import { DocumentViewer } from './components/DocumentViewer'
 import { downloadZip } from './utils/zip'
 import { DOCUMENT_TYPES } from './types/documents'
 
