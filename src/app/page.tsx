@@ -1,26 +1,14 @@
 'use client'
 
 import { useState } from 'react'
-import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { z } from 'zod'
 import { DocumentTextIcon, ArrowDownTrayIcon } from '@heroicons/react/24/outline'
 import { DocumentViewer } from './components/DocumentViewer'
 import { downloadZip } from './utils/zip'
 import { DOCUMENT_TYPES } from './types/documents'
 
-const projectSchema = z.object({
-  description: z.string().min(10, 'Description must be at least 10 characters'),
-  projectType: z.enum(['web', 'mobile', 'desktop', 'ai', 'other']),
-  selectedDocuments: z.array(z.string()).min(1, 'Select at least one document to generate'),
-})
-
-type ProjectFormData = z.infer<typeof projectSchema>
-
 export default function Home() {
   const [documents, setDocuments] = useState<Record<string, string>>({})
   const [isGenerating, setIsGenerating] = useState(false)
-  const [currentDocType, setCurrentDocType] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [progress, setProgress] = useState<number>(0)
   const [generationErrors, setGenerationErrors] = useState<Record<string, string>>({})
@@ -30,29 +18,13 @@ export default function Home() {
   const [description, setDescription] = useState('')
   const [type, setType] = useState('web')
 
-  const {
-    register,
-    handleSubmit,
-    setValue,
-    formState: { errors },
-  } = useForm<ProjectFormData>({
-    resolver: zodResolver(projectSchema),
-    defaultValues: {
-      projectType: 'web',
-      description: '',
-      selectedDocuments: DOCUMENT_TYPES.map(d => d.key),
-    },
-  })
-
   const handleSelectAll = () => {
     const allDocs = DOCUMENT_TYPES.map(d => d.key)
     setSelectedDocs(new Set(allDocs))
-    setValue('selectedDocuments', allDocs)
   }
 
   const handleDeselectAll = () => {
     setSelectedDocs(new Set())
-    setValue('selectedDocuments', [])
   }
 
   const handleToggleDocument = (docKey: string) => {
@@ -63,7 +35,6 @@ export default function Home() {
       newSelected.add(docKey)
     }
     setSelectedDocs(newSelected)
-    setValue('selectedDocuments', Array.from(newSelected))
   }
 
   const generateDocument = async (documentType: string) => {
@@ -98,16 +69,29 @@ export default function Home() {
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    if (!description.trim()) {
+      setError('Description is required')
+      return
+    }
+
+    if (selectedDocs.size === 0) {
+      setError('Select at least one document to generate')
+      return
+    }
+
+    setError(null)
     setIsGenerating(true)
     setDocuments({})
     setGenerationErrors({})
     setProgress(0)
     setIsZipReady(false)
 
-    const totalDocuments = DOCUMENT_TYPES.length
+    const selectedDocTypes = DOCUMENT_TYPES.filter(doc => selectedDocs.has(doc.key))
+    const totalDocuments = selectedDocTypes.length
     let completedDocuments = 0
 
-    for (const docType of DOCUMENT_TYPES) {
+    for (const docType of selectedDocTypes) {
       try {
         const content = await generateDocument(docType.key)
         setDocuments(prev => ({
@@ -173,9 +157,6 @@ export default function Home() {
               <option value="ai">AI/ML Application</option>
               <option value="other">Other</option>
             </select>
-            {errors.projectType && (
-              <p className="mt-1 text-sm text-red-400">{errors.projectType.message}</p>
-            )}
           </div>
 
           <div>
@@ -190,9 +171,6 @@ export default function Home() {
               rows={6}
               placeholder="Describe your project in detail..."
             />
-            {errors.description && (
-              <p className="mt-1 text-sm text-red-400">{errors.description.message}</p>
-            )}
           </div>
 
           <div>
@@ -233,9 +211,6 @@ export default function Home() {
                 </div>
               ))}
             </div>
-            {errors.selectedDocuments && (
-              <p className="mt-2 text-sm text-red-400">{errors.selectedDocuments.message}</p>
-            )}
           </div>
 
           {error && (
@@ -247,7 +222,7 @@ export default function Home() {
           {isGenerating && (
             <div className="space-y-3">
               <div className="flex justify-between text-sm text-gray-300">
-                <span>Generating {currentDocType ? DOCUMENT_TYPES.find(d => d.key === currentDocType)?.label : '...'}</span>
+                <span>Generating documents...</span>
                 <span>{Math.round(progress)}%</span>
               </div>
               <div className="w-full bg-gray-700 rounded-full h-2.5">
